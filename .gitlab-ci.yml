@@ -1,0 +1,43 @@
+stages:
+  - lint
+  - test
+  - build
+  - deploy
+
+variables:
+  IMAGE_NAME: registry.gitlab.com/$CI_PROJECT_NAMESPACE/$CI_PROJECT_NAME
+
+before_script:
+  - python -V
+  - pip install -r requirements.txt
+  - pip install black flake8 pytest
+
+lint:
+  stage: lint
+  script:
+    - black --check .
+    - flake8 .
+
+pytest:
+  stage: test
+  script:
+    - pytest
+
+build:
+  stage: build
+  script:
+    - docker build -t $IMAGE_NAME:$CI_COMMIT_SHORT_SHA .
+    - echo $CI_REGISTRY_PASSWORD | docker login -u $CI_REGISTRY_USER $CI_REGISTRY --password-stdin
+    - docker push $IMAGE_NAME:$CI_COMMIT_SHORT_SHA
+    - docker tag $IMAGE_NAME:$CI_COMMIT_SHORT_SHA $IMAGE_NAME:latest
+    - docker push $IMAGE_NAME:latest
+
+k8s-deploy:
+  stage: deploy
+  image: bitnami/kubectl:latest
+  script:
+    - echo "$KUBE_CONFIG" > kubeconfig.yaml
+    - export KUBECONFIG=$(pwd)/kubeconfig.yaml
+    - kubectl apply -k k8s/dev
+  only:
+    - main
