@@ -1,0 +1,9 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: fastapi-config
+  labels:
+    app: fastapi
+data:
+  TIMEZONE_OFFSET: "+5.5"
+  GREETING: "Hello from Kubernetes!"

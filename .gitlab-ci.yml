@@ -1,43 +1,61 @@
-stages:
-  - lint
-  - test
-  - build
-  - deploy
-
 variables:
-  IMAGE_NAME: registry.gitlab.com/$CI_PROJECT_NAMESPACE/$CI_PROJECT_NAME
+  KUBE_CONTEXT: "gitlab.com/kashish6707-group/manifest_repo:k8s-connection"
 
-before_script:
-  - python -V
-  - pip install -r requirements.txt
-  - pip install black flake8 pytest
+stages:
+   - lint
+   - test
+   - build
+   - scan
+   - deploy
+  
 
 lint:
   stage: lint
+  image: python:3.11
   script:
-    - black --check .
-    - flake8 .
+    - pip install black
+    - black  src/
 
-pytest:
+test:
   stage: test
+  image: python:3.11
+  before_script:
+    - pip install --upgrade pip
+    - pip install -r src/requirements.txt
+    - pip install pytest
   script:
-    - pytest
+    - pytest src/
 
 build:
   stage: build
+  image: docker:latest
+  services:
+    - docker:dind
   script:
-    - docker build -t $IMAGE_NAME:$CI_COMMIT_SHORT_SHA .
-    - echo $CI_REGISTRY_PASSWORD | docker login -u $CI_REGISTRY_USER $CI_REGISTRY --password-stdin
-    - docker push $IMAGE_NAME:$CI_COMMIT_SHORT_SHA
-    - docker tag $IMAGE_NAME:$CI_COMMIT_SHORT_SHA $IMAGE_NAME:latest
-    - docker push $IMAGE_NAME:latest
+    - docker build -t fastapi:v1 .
+    - docker tag fastapi:v1 registry.gitlab.com/kashish6707-group/deploy_code:fastapi-v1
+    - echo "$CI_JOB_TOKEN" | docker login -u gitlab-ci-token --password-stdin $CI_REGISTRY
+    - docker push registry.gitlab.com/kashish6707-group/deploy_code:fastapi-v1
 
-k8s-deploy:
-  stage: deploy
-  image: bitnami/kubectl:latest
+scan:
+  stage: scan
+  image: aquasec/trivy:latest
   script:
-    - echo "$KUBE_CONFIG" > kubeconfig.yaml
-    - export KUBECONFIG=$(pwd)/kubeconfig.yaml
-    - kubectl apply -k k8s/dev
-  only:
-    - main
+    - trivy image \
+        --exit-code 1 \
+        --severity HIGH,CRITICAL \
+        --scanners vuln \
+        --username gitlab-ci-token \
+        --password "$CI_JOB_TOKEN" \
+        $CI_REGISTRY_IMAGE:fastapi-v1
+
+deploy:
+  image:
+    name: bitnami/kubectl:latest
+    entrypoint: ['']
+  script:
+    - kubectl config get-contexts
+    - kubectl config use-context "$KUBE_CONTEXT"   
+    - kubectl get pods -n prod
+    - kubectl apply -k manifests/dev
+   
