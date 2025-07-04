@@ -3,18 +3,19 @@ name: DevOps_Task
 on:
   push:
     branches: [ "main" ]
+
 jobs:
   build:
     runs-on: ubuntu-latest
 
     steps:
-    - uses: actions/checkout@v4
+    - name: Checkout Code
+      uses: actions/checkout@v4
 
-    - name: Install dependencies
-      run: make
+    - name: Set up Docker Buildx
+      uses: docker/setup-buildx-action@v3
 
-    - name: Run check
-      run: make check
+    - name: Build Docker Image
+      run: docker build -t fastapi:v1 .
 
-    - name: Run distcheck
-      run: make distcheck
+   
