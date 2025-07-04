@@ -7,11 +7,11 @@ WORKDIR /app
 RUN apt-get update && apt-get install -y build-essential
 
 # Copy requirements and install
-COPY src/requirements.txt .
+COPY app/requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
 # Copy the app source
-COPY src/ .
+COPY app/ .
 
 # Expose FastAPI default port
 EXPOSE 80
